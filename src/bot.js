@@ -11,7 +11,6 @@ const {
   AttachmentBuilder,
   EmbedBuilder,
   Events,
-  PermissionFlagsBits,
 } = require('discord.js');
 const store = require('./store');
 
@@ -34,11 +33,10 @@ function buildCommands() {
       o.setName('name').setDescription('What to send').setRequired(true).setAutocomplete(true)
     );
 
-  // /nf add|remove|list — manage items straight from Discord (Manage Server by default)
+  // /nf add|remove|list — manage items straight from Discord (open to everyone)
   const nf = new SlashCommandBuilder()
     .setName('nf')
     .setDescription('Manage nitrofree items')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addSubcommand((s) =>
       s
         .setName('add')
