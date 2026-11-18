@@ -4,8 +4,10 @@ services:
     container_name: nitrofree
     restart: unless-stopped
     env_file: .env
+    environment:
+      PORT: "3000"
     ports:
-      - "${PORT:-3000}:3000"
+      - "${HOST_PORT:-3100}:3000"
     volumes:
       - nitrofree-data:/data
 
