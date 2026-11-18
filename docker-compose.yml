@@ -1,0 +1,13 @@
+services:
+  nitrofree:
+    build: .
+    container_name: nitrofree
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - nitrofree-data:/data
+
+volumes:
+  nitrofree-data:

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>nitrofree</title>
+<style>
+  :root{--bg:#0b0b0b;--panel:#141414;--line:#2a2a2a;--fg:#eee;--dim:#888}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px ui-monospace,Menlo,Consolas,monospace}
+  header{display:flex;justify-content:space-between;align-items:center;padding:20px 28px;border-bottom:1px solid var(--line)}
+  h1{margin:0;font-size:22px;letter-spacing:-.5px}
+  .st{color:var(--dim);font-size:12px}
+  main{padding:28px;max-width:1100px;margin:auto}
+  #drop{border:1px dashed #444;padding:28px;text-align:center;color:var(--dim);cursor:pointer;border-radius:6px;margin-bottom:12px}
+  #drop.over{border-color:#fff;color:#fff}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px}
+  input,select,button{padding:9px 11px;border:1px solid var(--line);background:var(--panel);color:var(--fg);font:inherit;border-radius:4px}
+  input[type=text]{flex:1;min-width:160px}
+  button{cursor:pointer} button.p{background:#eee;color:#000;font-weight:700}
+  button.d{color:#f66}
+  #err{color:#f66;min-height:1.2em;margin-bottom:8px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+  .card{border:1px solid var(--line);background:var(--panel);border-radius:6px;overflow:hidden;display:flex;flex-direction:column}
+  .card .m{height:150px;display:grid;place-items:center;background:#000}
+  .card .m img,.card .m video{max-width:100%;max-height:150px}
+  .card .b{padding:10px;display:flex;flex-direction:column;gap:8px}
+  .name{font-weight:700}.tag{color:var(--dim);font-size:12px}
+  .acts{display:flex;gap:6px}.acts>*{flex:1;padding:6px}
+  .empty{color:var(--dim);text-align:center;padding:40px}
+</style></head><body>
+<header><div><h1>nitrofree</h1><div class="st" id="st"></div></div>
+<div><button onclick="sync()">resync commands</button> <button onclick="logout()">logout</button></div></header>
+<main>
+  <div id="drop">drop png / jpg / gif / webp / mp4 / webm here, or click</div>
+  <input type="file" id="file" hidden accept="image/*,video/*" multiple>
+  <div id="err"></div>
+  <div class="row" id="meta" hidden>
+    <input type="text" id="name" placeholder="command name (e.g. pepe-laugh)">
+    <select id="mode"><option value="embed">embed (image/gif)</option><option value="file">raw file</option></select>
+    <button class="p" id="go">upload</button>
+    <span class="st" id="pick" style="align-self:center"></span>
+  </div>
+  <div class="grid" id="grid"></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let queue=[];
+const api=async(u,o)=>{const r=await fetch(u,o);if(r.status==401)location='/login';const j=await r.json();if(!r.ok)throw new Error(j.error||'error');return j};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const err=m=>{$('err').textContent=m||''};
+
+async function load(){
+  const {items,status}=await api('/api/items');
+  $('st').textContent=(status.ready?`● ${status.tag}`:'○ bot offline')+` · ${items.length} items · ${status.registered} commands live`
+    +(status.skipped?` · ${status.skipped} over limit (use /nitro)`:'')+(status.error?` · sync error: ${status.error}`:'');
+  $('grid').innerHTML=items.length?items.map(i=>`
+    <div class="card"><div class="m">${i.type=='video'?`<video src="/media/${i.file}" muted loop controls></video>`:`<img src="/media/${i.file}" loading="lazy">`}</div>
+    <div class="b"><div><span class="name">/${esc(i.name)}</span> <span class="tag">${i.type} · ${(i.size/1024).toFixed(0)}KB</span></div>
+    <div class="acts">
+      <select onchange="patch('${esc(i.name)}',{mode:this.value})" ${i.type=='video'?'disabled':''}>
+        <option value="embed" ${i.mode=='embed'?'selected':''}>embed</option><option value="file" ${i.mode=='file'?'selected':''}>file</option></select>
+      <button onclick="ren('${esc(i.name)}')">rename</button>
+      <button class="d" onclick="del('${esc(i.name)}')">del</button></div></div></div>`).join('')
+    :'<div class="empty">nothing yet — upload something</div>';
+}
+function pick(files){queue=[...files];if(!queue.length)return;$('meta').hidden=false;
+  $('pick').textContent=queue.length+' file(s)';
+  $('name').value=queue.length==1?queue[0].name.replace(/\.[^.]+$/,''):'';
+  $('name').disabled=queue.length>1;$('name').placeholder=queue.length>1?'names taken from filenames':'command name'}
+async function go(){err();
+  for(const f of queue){const fd=new FormData();
+    if(queue.length==1&&$('name').value)fd.append('name',$('name').value);
+    fd.append('mode',$('mode').value);fd.append('file',f);
+    try{await api('/api/items',{method:'POST',body:fd})}catch(e){err(f.name+': '+e.message)}}
+  queue=[];$('meta').hidden=true;load()}
+async function patch(n,b){try{await api('/api/items/'+n,{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify(b)})}catch(e){err(e.message)}load()}
+function ren(n){const v=prompt('New name',n);if(v)patch(n,{newName:v})}
+async function del(n){if(confirm('Delete /'+n+'?')){await api('/api/items/'+n,{method:'DELETE'});load()}}
+async function sync(){try{await api('/api/sync',{method:'POST'});err()}catch(e){err(e.message)}load()}
+async function logout(){await fetch('/api/logout',{method:'POST'});location='/login'}
+$('go').onclick=go;
+$('drop').onclick=()=>$('file').click();
+$('file').onchange=e=>pick(e.target.files);
+$('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('over')};
+$('drop').ondragleave=()=>$('drop').classList.remove('over');
+$('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('over');pick(e.dataTransfer.files)};
+load();
+</script></body></html>
