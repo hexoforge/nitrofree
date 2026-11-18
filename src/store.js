@@ -30,7 +30,7 @@ function sanitizeName(raw) {
     .slice(0, 32);
 }
 
-const RESERVED = new Set(['nitro']);
+const RESERVED = new Set(['nitro', 'nf']);
 
 function typeFromMime(mime) {
   if (mime === 'image/gif') return 'gif';
